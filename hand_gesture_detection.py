@@ -4,71 +4,74 @@ import mediapipe as mp
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
-print("Hello")
-mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=2, min_detection_confidence=0.7)
-mpDraw = mp.solutions.drawing_utils
 
-model = load_model('mp_hand_gesture')
+def start_camera_and_detect():
 
-with open('gesture.names', 'r') as f:
-    classNames = f.read().split('\n')
+    print("Starting camera....")
+    mpHands = mp.solutions.hands
+    hands = mpHands.Hands(max_num_hands=2, min_detection_confidence=0.7)
+    mpDraw = mp.solutions.drawing_utils
 
-# Remove any empty strings from classNames
-classNames = [name for name in classNames if name]
+    model = load_model('mp_hand_gesture')
 
-cap = cv2.VideoCapture(0)
+    # with open('gesture.names', 'r') as f:
+    #     classNames = f.read().split('\n')
 
-while True:
-    _, frame = cap.read()
+    # # Remove any empty strings from classNames
+    # classNames = [name for name in classNames if name]
 
-    x, y, c = frame.shape
+    cap = cv2.VideoCapture(0)
 
-    frame = cv2.flip(frame, 1)
-    framergb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    while True:
+        _, frame = cap.read()
 
-    result = hands.process(framergb)
+        x, y, c = frame.shape
 
-    if result.multi_hand_landmarks:
-        for handslms in result.multi_hand_landmarks:
-            landmarks = []
-            for lm in handslms.landmark:
-                lmx = int(lm.x * x)
-                lmy = int(lm.y * y)
-                landmarks.append([lmx, lmy])
+        frame = cv2.flip(frame, 1)
+        framergb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Drawing landmarks on frames
-            mpDraw.draw_landmarks(frame, handslms, mpHands.HAND_CONNECTIONS)
+        result = hands.process(framergb)
 
-            # Extracting relevant landmarks for thumbs up and thumbs down
-            thumb_tip = landmarks[4]
-            index_tip = landmarks[8]
+        if result.multi_hand_landmarks:
+            for handslms in result.multi_hand_landmarks:
+                landmarks = []
+                for lm in handslms.landmark:
+                    lmx = int(lm.x * x)
+                    lmy = int(lm.y * y)
+                    landmarks.append([lmx, lmy])
 
-            # Calculate the distance between thumb tip and index finger tip
-            distance = np.sqrt((thumb_tip[0] - index_tip[0])**2 + (thumb_tip[1] - index_tip[1])**2)
+                # Drawing landmarks on frames
+                mpDraw.draw_landmarks(frame, handslms, mpHands.HAND_CONNECTIONS)
 
-            # Predict gesture
-            prediction = model.predict([landmarks])
-            classID = np.argmax(prediction)
+                # Extracting relevant landmarks for thumbs up and thumbs down
+                thumb_tip = landmarks[4]
+                index_tip = landmarks[8]
 
-            if classID == 0 and distance > 50:  
-                className = "Thumbs Up"
-            elif classID == 1 and distance < 30:  
-                className = "Thumbs Down"
-            else:
-                className = "Unknown"
+                # Calculate the distance between thumb tip and index finger tip
+                distance = np.sqrt((thumb_tip[0] - index_tip[0])**2 + (thumb_tip[1] - index_tip[1])**2)
 
-            hand_side = "Left" if landmarks[0][0] < x / 2 else "Right"
+                # Predict gesture
+                prediction = model.predict([landmarks])
+                classID = np.argmax(prediction)
 
-            text_position = (10, 50) if hand_side == "Right" else (x - 150, 50)
+                if classID == 0 and distance > 50:  
+                    className = "Thumbs Up"
+                elif classID == 1 and distance < 30:  
+                    className = "Thumbs Down"
+                else:
+                    className = "Unknown"
 
-            cv2.putText(frame, f"{hand_side} Hand: {className}", text_position,
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 1, cv2.LINE_AA)
+                hand_side = "Left" if landmarks[0][0] < x / 2 else "Right"
 
-    cv2.imshow("Output", frame)
+                text_position = (10, 50) if hand_side == "Right" else (x - 150, 50)
 
-    if cv2.waitKey(1) == ord('q'):
-        break
+                cv2.putText(frame, f"{hand_side} Hand: {className}", text_position,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 1, cv2.LINE_AA)
 
-cap.release()
-cv2.destroyAllWindows()
+        cv2.imshow("Output", frame)
+
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
